@@ -1,0 +1,10 @@
+*.out
+*.swp
+*.bak
+*.backup
+.terraform/
+terraform.tfstate
+gcp_compute_k8s
+gcp_compute_k8s.pub
+*~
+.*.swp
