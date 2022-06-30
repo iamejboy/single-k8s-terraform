@@ -25,6 +25,16 @@ subjects:
   namespace: kube-system
 
 ---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: admin-user
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"
+  namespace: kube-system
+
+---
 EOF
 }
 
@@ -59,6 +69,10 @@ install_kubernetes() {
 }
 
 install_docker() {
+  curl -O https://download.docker.com/linux/debian/dists/buster/pool/stable/amd64/containerd.io_1.4.3-1_amd64.deb
+  sudo apt install ./containerd.io_1.4.3-1_amd64.deb
+  sleep 5
+  sudo rm /etc/containerd/config.toml && sudo systemctl restart containerd && sudo rm ./containerd.io_1.4.3-1_amd64.deb
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
   sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   sudo apt-get update && sudo apt-get install -y docker-ce
@@ -85,11 +99,11 @@ main() {
   { (setup_networking && echo "INFO: Done setting up cluster networking"); } || { echo "ERROR: Failed to setup k8s cluster networking"; exit 1; }
 
   # Configure kubernetes master as worker
-  kubectl taint nodes --all node-role.kubernetes.io/master- && echo "INFO: Kubernetes single node cluster is ready for use"
+  kubectl taint nodes --all node-role.kubernetes.io/master- && kubectl taint nodes --all node-role.kubernetes.io/control-plane- && echo "INFO: Kubernetes single node cluster is ready for use"
 
   # Setup test admin user
   setup_admin_user || { echo "ERROR: Failed to create test admin user"; exit 1; }
-  token="$(kubectl get secret "$(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')" -nkube-system -o jsonpath='{.data.token}' | base64 --decode)"
+  token="$(kubectl get secret admin-user -nkube-system -o jsonpath='{.data.token}' | base64 --decode)"
   echo -e "To connect on your local machince, Run the following command:\n
 - kubectl config set-cluster my-k8s --server=https://{PUBLIC_IP}:6443 --insecure-skip-tls-verify\n
 - kubectl config set-credentials my-admin-user --token=${token}\n
